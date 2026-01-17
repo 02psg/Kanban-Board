@@ -1,0 +1,70 @@
+- hosts: all
+  become: yes
+  tasks:
+
+    - name: Update system
+      apt:
+        update_cache: yes
+
+    - name: Install base packages
+      apt:
+        name:
+          - docker.io
+          - git
+          - curl
+          - apt-transport-https
+          - ca-certificates
+        state: present
+
+    - name: Start and enable Docker
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Install k3s (Kubernetes)
+      shell: curl -sfL https://get.k3s.io | sh -
+
+    - name: Configure kubectl for ubuntu user
+      shell: |
+        mkdir -p /home/ubuntu/.kube
+        cp /etc/rancher/k3s/k3s.yaml /home/ubuntu/.kube/config
+        chown ubuntu:ubuntu /home/ubuntu/.kube/config
+
+    # Jenkins installation (proper way)
+    - name: Install Java (required for Jenkins)
+      apt:
+        name: openjdk-17-jre
+        state: present
+
+    - name: Add Jenkins GPG key
+      shell: |
+        curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key \
+        | tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+
+    - name: Add Jenkins repository
+      shell: |
+        echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+        https://pkg.jenkins.io/debian-stable binary/ \
+        | tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+    - name: Update apt after adding Jenkins repo
+      apt:
+        update_cache: yes
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+
+    - name: Start Jenkins
+      service:
+        name: jenkins
+        state: started
+        enabled: true
+
+    - name: Clone Kanban repository
+      git:
+        repo: https://github.com/02psg/Kanban-Board.git
+        dest: /home/ubuntu/Kanban-Board
+        force: yes
